@@ -48,7 +48,12 @@ class World {
       }
     }
   }
-  groundY(px) { const tx = Math.floor(px / TS); for (let y = 0; y < 14; y++) { const t = this.tile(tx, y); if (SOLID[t] || t === 9) return y * TS; } return 14 * TS; }
+  groundY(px) {
+    const tx = Math.floor(px / TS), s = t => SOLID[t] || t === 9;
+    if (!s(this.tile(tx, 13))) return 14 * TS;
+    let y = 13; while (y > 0 && s(this.tile(tx, y - 1))) y--;
+    return y * TS;
+  }
   tile(tx, ty) {
     if (tx < 0 || tx >= this.w) return 18;
     if (this.lock && (tx < this.lock.l || tx > this.lock.r)) return 18;

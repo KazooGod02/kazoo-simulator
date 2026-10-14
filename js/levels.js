@@ -22,7 +22,12 @@ class LB {
     if (water) for (let x = s; x < s + len; x++) { this.set(x, 12, 11); this.set(x, 13, 12); }
     this.x += len; return s;
   }
-  top(x) { for (let y = 0; y < 14; y++) { const t = this.get(x, y); if (SOLID[t] || t === 9) return y; } return 14; }
+  top(x) {
+    const s = t => SOLID[t] || t === 9;
+    if (!s(this.get(x, 13))) return 14;
+    let y = 13; while (y > 0 && s(this.get(x, y - 1))) y--;
+    return y;
+  }
   blocks(x, y, str) {
     const K = { '?': 'coin', T: 'taco', C: 'chancla', A: 'agua', K: 'kazoo', U: 'concha' };
     for (let i = 0; i < str.length; i++) {
@@ -199,7 +204,7 @@ function L12() {
     r.blocks(4, 9, '########');
     r.mitem(16, 8, 0);
     r.coins(14, 5, 5);
-    r.pipe(20, 2, { exit: true });
+    r.pipe(20, 2, { exit: true }); r.sign(18, 'salida');
   });
   return L.done();
 }
@@ -320,7 +325,7 @@ function L22() {
     r.blocks(4, 9, '###'); r.blocks(9, 7, '###'); r.blocks(14, 5, '###');
     r.mitem(15, 3, 1);
     r.coins(4, 8, 3); r.coins(9, 6, 3); r.coins(17, 9, 3);
-    r.pipe(20, 2, { exit: true });
+    r.pipe(20, 2, { exit: true }); r.sign(18, 'salida');
   });
   return L.done();
 }
@@ -381,7 +386,7 @@ function L31() {
     r.mitem(16, 2, 2);
     r.coins(4, 8, 2); r.coins(8, 6, 2); r.coins(12, 4, 2);
     r.e('glitch', 10, 3);
-    r.pipe(20, 2, { exit: true });
+    r.pipe(20, 2, { exit: true }); r.sign(18, 'salida');
   });
   return L.done();
 }
