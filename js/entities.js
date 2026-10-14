@@ -81,7 +81,7 @@ class World {
     e.y += e.vy; e.onGround = false; e.bonk = null;
     const l = Math.floor(e.x / TS), r = Math.floor((e.x + e.w - 1) / TS);
     if (e.vy > 0) {
-      const ty = Math.floor((e.y + e.h - 1) / TS);
+      const ty = Math.floor((e.y + e.h - 0.01) / TS);
       for (let tx = l; tx <= r; tx++) {
         const t = this.tile(tx, ty);
         if (SOLID[t] || (t === 9 && prevBot <= ty * TS + 1)) { e.y = ty * TS - e.h; e.vy = 0; e.onGround = true; e.gt = t; e.gtx = tx; e.gty = ty; break; }
