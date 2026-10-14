@@ -818,6 +818,7 @@ class Taponazo extends Boss {
     }
     this.physics(0.35);
     if (wasAir && this.onGround) {
+      this.st = 0; // la espera cuenta desde que aterriza, no desde que saltó
       W.shake(12); Snd.sfx('stomp'); W.burst(this.cx, this.y + this.h, '#c3cbe0', 10, 2);
       if (this.hops % 2 === 0) { const p = new Panuelo(this.cx - 8, this.y + this.h - 13); p.active = true; p.dir = P.cx < this.cx ? -1 : 1; W.ents.push(p); }
     }
