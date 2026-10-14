@@ -320,10 +320,11 @@ class Player extends Ent {
     const B = W.boss;
     if (B && !B.dead && B.solidHit !== false && overlap(this, B.hitbox())) {
       const hb = B.hitbox();
-      const prevBot = this.y + this.h - this.vy;
-      if (this.vy > 0 && prevBot <= hb.y + 10 && B.canStomp()) { B.hit('stomp'); this.vy = -6.2; Snd.sfx('stomp'); }
+      // velocidad relativa: el jefe también puede venir subiendo (Taponazo)
+      const rel = this.vy - (B.vy || 0), prevBot = this.y + this.h - rel;
+      if (rel > 0 && prevBot <= hb.y + 10 && B.canStomp()) { B.hit('stomp'); this.vy = -6.2; Snd.sfx('stomp'); }
       else if (this.star > 0) { if (B.canStomp()) B.hit('star'); }
-      else this.hurt();
+      else if (B.inv === 0) this.hurt(); // recién golpeado (parpadeando) no hace daño
     }
     for (const s of W.shots) if (!s.mine && !s.dead && overlap(this, s)) { if (this.star === 0) { this.hurt(); s.dead = true; } }
     // animación
