@@ -809,9 +809,12 @@ function frame(now) {
   let dt = Math.min(100, now - frame.last); frame.last = now;
   frame.acc = (frame.acc || 0) + dt;
   let steps = 0;
-  while (frame.acc >= 1000 / 60 && steps < 4) { G.update(); frame.acc -= 1000 / 60; steps++; }
-  if (steps === 4) frame.acc = 0;
-  G.draw();
+  // un error en un cuadro no debe congelar todo el juego: se reporta y se sigue
+  try {
+    while (frame.acc >= 1000 / 60 && steps < 4) { G.update(); frame.acc -= 1000 / 60; steps++; }
+    if (steps === 4) frame.acc = 0;
+    G.draw();
+  } catch (e) { console.error(e); frame.acc = 0; ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalAlpha = 1; ctx.filter = 'none'; }
   requestAnimationFrame(frame);
 }
 buildSprites();

@@ -324,7 +324,7 @@ class Player extends Ent {
       const rel = this.vy - (B.vy || 0), prevBot = this.y + this.h - rel;
       if (rel > 0 && prevBot <= hb.y + 10 && B.canStomp()) { B.hit('stomp'); this.vy = -6.2; Snd.sfx('stomp'); }
       else if (this.star > 0) { if (B.canStomp()) B.hit('star'); }
-      else if (B.inv === 0) this.hurt(); // recién golpeado (parpadeando) no hace daño
+      else if (B.inv === 0 && !B.harmless) this.hurt(); // recién golpeado (parpadeando) no hace daño
     }
     for (const s of W.shots) if (!s.mine && !s.dead && overlap(this, s)) { if (this.star === 0) { this.hurt(); s.dead = true; } }
     // animación
@@ -592,6 +592,7 @@ class Enemy extends Ent {
 class Corpse extends Ent {
   constructor(e, fling) {
     super(e.x, e.y, e.w, e.h); this.spr = e.spr; this.fling = fling; this.dir = e.dir; this.corpse = true; this.active = true;
+    this.src = e; e.stun = 0;
     this.flat = !fling && (e.spr === 'panuelo');
     if (fling) { this.vy = -4.5; this.vx = rnd(-1, 1); }
     W.burst(e.cx, e.cy, '#ffffff', 6, 1.5);
@@ -603,6 +604,14 @@ class Corpse extends Ent {
   }
   draw() {
     const s = SPR[this.spr];
+    if (!s) {
+      // enemigos sin sprite (los pop-ups se dibujan a mano): se reusa su propio dibujo
+      const e = this.src;
+      ctx.save();
+      if (this.fling) { ctx.translate(this.cx, this.cy); ctx.scale(1, -1); ctx.translate(-e.cx, -e.cy); }
+      else { ctx.translate(e.cx, e.y + e.h); ctx.scale(1, 0.4); ctx.translate(-e.cx, -(e.y + e.h)); }
+      e.draw(); ctx.restore(); return;
+    }
     if (this.flat) { drawSpr('panuelo_flat', 0, this.x + (this.w - 16) / 2, this.y + this.h - 16); return; }
     if (!this.fling) { ctx.save(); ctx.translate(this.cx, this.y + this.h); ctx.scale(1, 0.4); drawSpr(this.spr, 0, -s.w / 2, -s.h, this.dir > 0); ctx.restore(); return; }
     ctx.save(); ctx.translate(this.cx, this.cy); ctx.scale(1, -1); drawSpr(this.spr, 0, -s.w / 2, -s.h / 2, this.dir > 0); ctx.restore();
@@ -833,35 +842,56 @@ class Taponazo extends Boss {
   }
 }
 // ---- POP-UP SUPREMO ----
+// Ciclo fijo: flota (y suelta pop-ups y cookies) → avisa → cae al suelo → descansa (¡písalo!) → sube.
 class PopBoss extends Boss {
-  constructor(ax) { super(ax + 12 * TS, 3 * TS, 72, 44, 'POP-UP SUPREMO', 5); this.ax = ax; this.st = 0; this.mode = 'float'; this.hx = this.x; }
+  constructor(ax) { super((ax + 10) * TS, 3 * TS, 72, 44, 'POP-UP SUPREMO', 4); this.ax = ax; this.st = 0; this.mode = 'float'; }
   hitbox() { return { x: this.x, y: this.y, w: this.w, h: this.h }; }
   canStomp() { return this.inv === 0; }
+  // tirado en el suelo o subiendo no hace daño: solo hay que caerle encima
+  get harmless() { return this.mode === 'rest' || this.mode === 'rise'; }
   update() {
     if (!this.tick()) return;
     this.st++;
     const minX = this.ax * TS + 24, maxX = this.ax * TS + 23 * TS - this.w - 8;
+    const floatY = 2.5 * TS + Math.sin(this.t / 30) * 10, groundY = 12 * TS - this.h;
     if (this.mode === 'float') {
       this.x += (clamp(P.cx - this.w / 2, minX, maxX) - this.x) * 0.012;
-      this.y = 2.5 * TS + Math.sin(this.t / 30) * 10;
-      if (this.st % 70 === 0) { const p = new Popup(this.cx - 15, this.y + 20); p.active = true; W.ents.push(p); }
-      if (this.st % 50 === 25) { const a = Math.atan2(P.cy - this.cy, P.cx - this.cx); W.shots.push(new Shot(this.cx, this.cy, Math.cos(a) * 2, Math.sin(a) * 2, 'cookie', { w: 8, h: 7, ghost: true })); Snd.sfx('throw'); }
-      if (this.st > 260) { this.mode = 'dive'; this.st = 0; W.text(this.cx, this.y - 10, '¡CIERRA EL ANUNCIO!', '#ffd23f'); }
+      this.y += (floatY - this.y) * 0.1;
+      const minis = W.ents.filter(e => e instanceof Popup && !e.dead).length;
+      if (this.st % 120 === 60 && minis < 2) { const p = new Popup(this.cx - 15, this.y + 20); p.active = true; W.ents.push(p); }
+      if (this.st % 90 === 30) { const a = Math.atan2(P.cy - this.cy, P.cx - this.cx); W.shots.push(new Shot(this.cx, this.cy, Math.cos(a) * 1.6, Math.sin(a) * 1.6, 'cookie', { w: 8, h: 7, ghost: true })); Snd.sfx('throw'); }
+      if (this.st > 200) { this.mode = 'warn'; this.st = 0; W.text(this.cx, this.y - 10, '¡CIERRA EL ANUNCIO!', '#ffd23f'); }
+    } else if (this.mode === 'warn') {
+      this.y += (floatY - this.y) * 0.1;
+      if (this.st > 45) { this.mode = 'dive'; this.st = 0; }
     } else if (this.mode === 'dive') {
-      this.y += (8 * TS - this.y) * 0.08;
-      if (this.st > 150) { this.mode = 'float'; this.st = 0; }
+      this.y = Math.min(groundY, this.y + 2 + this.st * 0.35);
+      if (this.y >= groundY) { this.mode = 'rest'; this.st = 0; W.shake(10); Snd.sfx('stomp'); W.burst(this.cx, this.y + this.h, '#9fd0ff', 12, 2); }
+    } else if (this.mode === 'rest') {
+      if (this.st > 170) { this.mode = 'rise'; this.st = 0; }
+    } else if (this.mode === 'rise') {
+      this.y += (floatY - this.y) * 0.06;
+      if (this.y - floatY < 4) { this.mode = 'float'; this.st = 0; }
     }
   }
-  onHit() { this.mode = 'float'; this.st = 0; for (const e of W.ents) if (e instanceof Popup) e.kill(true); }
+  onHit() {
+    this.mode = 'rise'; this.st = 0;
+    for (const e of W.ents) if (e instanceof Popup && !e.dead) e.kill(true);
+    W.shots = W.shots.filter(s => s.mine);
+  }
   draw() {
+    // sombra de aviso antes de caer
+    if (this.mode === 'warn' || this.mode === 'dive') { ctx.fillStyle = '#00000066'; ctx.fillRect(this.x + 6, 12 * TS - 3, this.w - 12, 3); }
     if (this.blink()) return;
-    const x = Math.round(this.x), y = Math.round(this.y), w = this.w, h = this.h;
+    const sx = this.mode === 'warn' ? rnd(-2, 2) : 0;
+    const x = Math.round(this.x + sx), y = Math.round(this.y), w = this.w, h = this.h;
     R(x - 2, y - 2, w + 4, h + 4, '#000'); R(x, y, w, h, '#fff'); R(x, y, w, 10, '#2a5ad0');
     R(x + w - 10, y + 1, 9, 8, '#e23b3b'); txt('X', x + w - 9, y + 1, '#fff', 'left', 8, null);
     txt('¡SOLTERAS', x + w / 2, y + 14, '#e23b3b', 'center', 8, null);
     txt('EN TU ZONA!', x + w / 2, y + 24, '#e23b3b', 'center', 8, null);
     R(x + 8, y + 35, w - 16, 6, (this.t >> 3) % 2 ? '#ff7ab0' : '#ffd23f'); txt('CLIC', x + w / 2, y + 34, '#000', 'center', 8, null);
-    if (this.mode === 'dive' && (this.t >> 3) % 2) txt('▼', x + w - 6, y - 12, '#ffd23f', 'center');
+    if (this.mode === 'warn' && (this.t >> 3) % 2) txt('▼', x + w / 2, y + h + 6, '#ffd23f', 'center');
+    if (this.mode === 'rest' && (this.t >> 3) % 2) txt('¡SÁLTALE ENCIMA!', x + w / 2, y - 14, '#ffd23f', 'center');
   }
 }
 // ---- FIRULAIS RADIOACTIVO ----
